@@ -1,0 +1,7 @@
+region_id,region_nombre,mision,poi_id,poi_nombre,latitud,longitud,elevacion_m,temp_min_c,temp_max_c,temp_promedio_c,presion_min_mbar,presion_max_mbar,radiacion_mSv_dia,agua_ligada_pct,riesgo_eva,descripcion
+crater_gale,Cráter Gale,MSL Curiosity,bradbury_landing,Bradbury Landing,-4.5895,137.4417,-4500,-90.0,5.0,-55.0,6.1,8.8,0.64,1.75,Bajo,Llanura de grava fluvial consolidada; zona segura para hábitat inicial.
+crater_gale,Cráter Gale,MSL Curiosity,yellowknife_bay,Yellowknife Bay,-4.568,137.448,-4510,-90.0,5.0,-55.0,6.1,8.8,0.64,1.75,Bajo,Lutitas lacustres ricas en arcillas hidratadas (fuente potencial de extracción térmica de agua).
+crater_gale,Cráter Gale,MSL Curiosity,vera_rubin_ridge,Vera Rubin Ridge,-4.685,137.395,-4200,-90.0,5.0,-55.0,6.1,8.8,0.64,1.75,Moderado,Cresta elevada rica en hematita cristalina; punto alto ideal para comunicaciones.
+crater_gusev,Cráter Gusev,MER Spirit,columbia_memorial_station,Columbia Memorial Station,-14.5718,175.4785,-1930,-100.0,35.0,-50.0,5.8,7.9,0.7,10.0,Bajo,"Planicie basáltica estable con baja pendiente (<3°), apta para aterrizaje."
+crater_gusev,Cráter Gusev,MER Spirit,husband_hill,Cima de Husband Hill,-14.579,175.524,-1800,-100.0,35.0,-50.0,5.8,7.9,0.7,10.0,Moderado,Afloramientos ricos en sulfatos de magnesio/hierro y carbonatos (Comanche).
+crater_gusev,Cráter Gusev,MER Spirit,home_plate,Home Plate,-14.591,175.533,-1890,-100.0,35.0,-50.0,5.8,7.9,0.7,10.0,Bajo,Depósitos de sílice opalina hidratada (hasta 90% SiO2) formados por actividad hidrotermal.

@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>MARS-NAV // HUD Táctico EVA</title>
+    
+            <!-- Tipografías Sci-Fi de Google Fonts -->
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+
+            <!-- CSS de Leaflet -->
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <!-- SDK de Supabase -->
+            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+        <style>
+            :root {
+                --amber-glow: #f59e0b;
+                --amber-soft: #fbbf24;
+                --terracotta: #d97757;
+                --sand-light: #f5ebe6;
+                --sand-muted: #a89489;
+                --bg-basalt: #120d0a;
+                --panel-obsidian: #1a120e;
+                --card-surface: rgba(38, 26, 20, 0.75);
+            }
+
+            * { box-sizing: border-box; }
+
+            body { 
+                margin: 0; 
+                display: flex; 
+                background-color: var(--bg-basalt); 
+                color: var(--sand-light); 
+                font-family: 'Segoe UI', Tahoma, sans-serif; 
+                height: 100vh; 
+                overflow: hidden; 
+            }
+
+            #contenedor-mapa {
+                position: relative;
+                height: 100%;
+                width: 68%;
+                border-right: 2px solid rgba(217, 119, 87, 0.45);
+                box-shadow: inset -15px 0 35px rgba(18, 13, 10, 0.8);
+            }
+
+            #mapa { 
+                height: 100%; 
+                width: 100%; 
+                background-color: var(--bg-basalt); 
+            }
+
+            .hud-overlay-top {
+                position: absolute;
+                top: 15px;
+                left: 60px;
+                z-index: 1000;
+                background: rgba(26, 18, 14, 0.88);
+                backdrop-filter: blur(6px);
+                border: 1px solid rgba(245, 158, 11, 0.5);
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 0.85rem;
+                color: var(--amber-soft);
+                letter-spacing: 1.5px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+                pointer-events: none;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .status-dot {
+                width: 9px;
+                height: 9px;
+                background-color: var(--amber-glow);
+                border-radius: 50%;
+                box-shadow: 0 0 8px var(--amber-glow);
+                animation: parpadeo-suave 1.8s infinite ease-in-out alternate;
+            }
+
+            @keyframes parpadeo-suave {
+                from { opacity: 1; transform: scale(1); }
+                to { opacity: 0.35; transform: scale(0.85); }
+            }
+
+            .leaflet-bar {
+                border: none !important;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+            }
+            .leaflet-bar a {
+                background-color: rgba(26, 18, 14, 0.9) !important;
+                color: var(--amber-soft) !important;
+                border: 1px solid rgba(217, 119, 87, 0.4) !important;
+                font-family: 'Orbitron', sans-serif !important;
+                transition: all 0.2s ease;
+            }
+            .leaflet-bar a:hover {
+                background-color: var(--amber-glow) !important;
+                color: var(--bg-basalt) !important;
+                border-color: var(--amber-soft) !important;
+            }
+
+            .marcador-eva {
+                position: relative;
+                background-color: #fff3b0;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                border: 3px solid var(--amber-glow);
+                box-shadow: 0 0 12px var(--amber-glow), 0 0 24px rgba(245, 158, 11, 0.6);
+                cursor: pointer;
+                transition: transform 0.25s ease, background-color 0.25s ease;
+            }
+
+            .marcador-eva:hover {
+                transform: scale(1.35);
+                background-color: #ffffff;
+                border-color: #ffffff;
+            }
+
+            .marcador-eva::before,
+            .marcador-eva::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                border: 1.5px solid var(--amber-soft);
+                transform: translate(-50%, -50%);
+                animation: onda-solar 2.4s infinite ease-out;
+                pointer-events: none;
+            }
+
+            .marcador-eva::after {
+                animation-delay: 1.1s;
+            }
+
+            @keyframes onda-solar {
+                0% {
+                    width: 14px;
+                    height: 14px;
+                    opacity: 0.9;
+                    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+                }
+                100% {
+                    width: 58px;
+                    height: 58px;
+                    opacity: 0;
+                    box-shadow: 0 0 2px rgba(245, 158, 11, 0);
+                }
+            }
+
+            #panel-lateral { 
+                width: 32%; 
+                padding: 25px; 
+                background-color: var(--panel-obsidian);
+                background-image: 
+                    radial-gradient(circle at top right, rgba(217, 119, 87, 0.12), transparent 60%),
+                    linear-gradient(rgba(245, 158, 11, 0.025) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(245, 158, 11, 0.025) 1px, transparent 1px);
+                background-size: 100% 100%, 24px 24px, 24px 24px;
+                overflow-y: auto; 
+                position: relative;
+            }
+
+            .hud-header {
+                border-bottom: 1px solid rgba(217, 119, 87, 0.4);
+                padding-bottom: 14px;
+                margin-bottom: 22px;
+                position: relative;
+            }
+
+            .hud-header::after {
+                content: '';
+                position: absolute;
+                bottom: -1px;
+                left: 0;
+                width: 65px;
+                height: 3px;
+                background-color: var(--amber-glow);
+                border-radius: 2px;
+            }
+            .hud-subtitulo {
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 0.75rem;
+                color: var(--terracotta);
+                letter-spacing: 2.5px;
+                text-transform: uppercase;
+            }
+
+            h2 { 
+                font-family: 'Orbitron', sans-serif;
+                color: var(--sand-light); 
+                text-transform: uppercase; 
+                letter-spacing: 2px; 
+                font-size: 1.35rem; 
+                margin: 6px 0 0 0;
+                text-shadow: 0 2px 10px rgba(245, 158, 11, 0.2);
+            }
+
+            #instruccion {
+                font-family: 'Share Tech Mono', monospace;
+                background: rgba(38, 26, 20, 0.6);
+                border: 1px dashed rgba(217, 119, 87, 0.5);
+                color: var(--sand-muted);
+                padding: 22px;
+                text-align: center;
+                border-radius: 8px;
+                margin-top: 40px;
+                letter-spacing: 0.8px;
+                line-height: 1.6;
+            }
+
+            .tarjeta-dato {
+                background: var(--card-surface);
+                backdrop-filter: blur(4px);
+                border: 1px solid rgba(217, 119, 87, 0.2);
+                border-left: 3px solid var(--amber-glow);
+                border-radius: 6px;
+                padding: 12px 15px;
+                margin-bottom: 14px;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+                transition: all 0.25s ease;
+            }
+
+            .tarjeta-dato:hover {
+                border-color: rgba(245, 158, 11, 0.5);
+                background: rgba(48, 33, 25, 0.85);
+                transform: translateX(3px);
+            }
+
+            .grid-doble {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+
+            .dato-label { 
+                font-family: 'Share Tech Mono', monospace;
+                color: var(--sand-muted); 
+                font-size: 0.76rem; 
+                display: block; 
+                text-transform: uppercase; 
+                letter-spacing: 1px; 
+            }
+
+            .dato-valor { 
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 1.05rem; 
+                margin-top: 6px; 
+                font-weight: bold; 
+                color: var(--sand-light); 
+            }
+
+            #ui-nombre {
+                font-family: 'Orbitron', sans-serif;
+                color: var(--amber-soft);
+                font-size: 1.1rem;
+                letter-spacing: 0.5px;
+            }
+
+            .caja-estrategia {
+                background: rgba(217, 119, 87, 0.08);
+                border: 1px solid rgba(217, 119, 87, 0.3);
+                border-left: 3px solid var(--terracotta);
+                padding: 14px;
+                border-radius: 6px;
+                margin-top: 15px;
+            }
+            .estrategia-texto { 
+                font-size: 0.92rem; 
+                color: #ebd5c8; 
+                line-height: 1.55; 
+                margin-top: 8px;
+            }
+        
+            .riesgo-badge {
+                display: inline-block;
+                padding: 4px 10px;
+                border-radius: 4px;
+                font-family: 'Orbitron', sans-serif;
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                margin-top: 6px;
+            }
+            .riesgo-Bajo { 
+                background: rgba(82, 183, 136, 0.15); 
+                color: #74c69d; 
+                border: 1px solid rgba(116, 198, 157, 0.4);
+            }
+            .riesgo-Moderado { 
+                background: rgba(245, 158, 11, 0.15); 
+                color: var(--amber-soft); 
+                border: 1px solid rgba(251, 191, 36, 0.45);
+            }
+            .riesgo-Crítico { 
+                background: rgba(231, 111, 81, 0.2); 
+                color: #f4845f; 
+                border: 1px solid rgba(244, 132, 95, 0.5);
+            }
+        
+            .contenedor-imagen {
+                margin-top: 18px;
+                border: 1px solid rgba(217, 119, 87, 0.35);
+                border-radius: 8px;
+                overflow: hidden;
+                background: var(--bg-basalt);
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+                display: none;
+            }
+
+            .header-imagen {
+                background: rgba(38, 26, 20, 0.95);
+                color: var(--amber-soft);
+                font-family: 'Share Tech Mono', monospace;
+                font-size: 0.75rem;
+                padding: 8px 12px;
+                letter-spacing: 1.5px;
+                border-bottom: 1px solid rgba(217, 119, 87, 0.25);
+            }
+
+            .imagen-rover { 
+                width: 100%; 
+                max-height: 220px;
+                display: block; 
+                object-fit: cover; 
+            }
+
+            #panel-lateral::-webkit-scrollbar { width: 6px; }
+            #panel-lateral::-webkit-scrollbar-track { background: var(--bg-basalt); }
+            #panel-lateral::-webkit-scrollbar-thumb { background: var(--terracotta); border-radius: 3px; }
+        </style>
+    </head>
+    <body>
+        <div id="contenedor-mapa">
+            <div class="hud-overlay-top">
+                <div class="status-dot"></div>
+                <span>RADAR TÁCTICO EVA // SECTOR AEOLIS-ELYSIUM (MC-23)</span>
+            </div>
+            <div id="mapa"></div>
+        </div>
+    
+        <div id="panel-lateral">
+            <div class="hud-header">
+                <div class="hud-subtitulo">SISTEMA DE NAVEGACIÓN MARCIANA</div>
+                <h2>TELEMETRÍA EVA</h2>
+            </div>
+
+            <div id="instruccion">
+                <span style="color: var(--amber-soft);">[ ESPERANDO SELECCIÓN DE OBJETIVO ]</span><br><br>
+                Selecciona una baliza solar en el mapa topográfico para desplegar la caracterización del cráter.
+            </div>
+        
+            <div id="datos-zona" style="display: none;">
+            
+                <div class="tarjeta-dato">
+                    <span class="dato-label">Región Geológica Identificada:</span>
+                    <div class="dato-valor" id="ui-nombre">---</div>
+                </div>
+
+                <div class="grid-doble">
+                    <div class="tarjeta-dato">
+                        <span class="dato-label">Coordenadas:</span>
+                        <div class="dato-valor" id="ui-coords">---</div>
+                    </div>
+                    <div class="tarjeta-dato">
+                        <span class="dato-label">Radiación (RAD):</span>
+                        <div class="dato-valor" id="ui-radiacion" style="color: var(--terracotta);">---</div>
+                    </div>
+                </div>
+            
+                <div class="grid-doble">
+                    <div class="tarjeta-dato">
+                        <span class="dato-label">Clima Superficial:</span>
+                        <div class="dato-valor" id="ui-temp" style="font-size: 0.92rem;">---</div>
+                    </div>
+                    <div class="tarjeta-dato">
+                        <span class="dato-label">Riesgo Operativo:</span>
+                        <div id="ui-riesgo" class="riesgo-badge">---</div>
+                    </div>
+                </div>
+
+                <div class="caja-estrategia">
+                    <span class="dato-label" style="color: var(--amber-soft);">⚡ Generación de Estrategias y Rutas Óptimas:</span>
+                    <div class="estrategia-texto" id="ui-estrategia">---</div>
+                </div>
+            
+                <div class="contenedor-imagen" id="contenedor-img">
+                    <div class="header-imagen">📷 CAM-ROVER // RECONOCIMIENTO ÓPTICO</div>
+                    <img id="ui-imagen" class="imagen-rover" src="" alt="Fotografía de Superficie">
+                </div>
+
+            </div>
+        </div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+        <script>
+            const limitesMapa = L.latLngBounds([ [23.5, 80.0], [-45.5, 182.5] ]);
+
+            const map = L.map('mapa', {
+                maxBounds: limitesMapa,
+                maxBoundsViscosity: 1.0,
+                maxZoom: 7,
+                zoomSnap: 0.01,
+                zoomDelta: 0.5
+            });
+
+            const URL_MAPA_BASE = 'https://whvimvyqhjtrrjsivfmo.supabase.co/storage/v1/object/public/imagenes_marte/mapa_base_grande.jpeg';
+            L.imageOverlay(URL_MAPA_BASE, limitesMapa).addTo(map);
+
+            function ajustarCoberturaTotal() {
+                const zoomCobertura = map.getBoundsZoom(limitesMapa, true) + 0.02;
+                map.setMinZoom(zoomCobertura);
+                map.setView([-12.0, 145.0], zoomCobertura);
+            }
+
+            ajustarCoberturaTotal();
+            window.addEventListener('resize', ajustarCoberturaTotal);
+
+            const SUPABASE_URL = 'https://whvimvyqhjtrrjsivfmo.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndodmltdnlxaGp0cnJqc2l2Zm1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ2ODMwMTMsImV4cCI6MjExMDI1OTAxM30.TdCa-eO-nxsGffRqlDk2cIL9yCKCiESZeXSAeNUff_A';
+            const clienteSupabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            const iconoPulsante = L.divIcon({
+                className: 'marcador-eva',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+            // === PREDICCIONES GENERADAS E INCRUSTADAS DIRECTAMENTE POR PYTHON ===
+            const prediccionesPython = {
+    "bradbury_landing": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "Bradbury Landing": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "-4.59_137.44": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "yellowknife_bay": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "Yellowknife Bay": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "-4.57_137.45": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "vera_rubin_ridge": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "Vera Rubin Ridge": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "-4.68_137.40": {
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "columbia_memorial_station": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "Columbia Memorial Station": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "-14.57_175.48": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "husband_hill": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "Cima de Husband Hill": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "-14.58_175.52": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "home_plate": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "Home Plate": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    },
+    "-14.59_175.53": {
+        "temperatura_promedio": "-50.0 °C",
+        "nivel_radiacion": "0.7 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ⚠️ ALERTA DE RADIACIÓN: Niveles elevados detectados. Mantenerse cerca de formaciones rocosas protectoras. Límite estricto de excursión EVA: 4 horas máx. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    }
+};
+
+            async function cargarZonasMarte() {
+                const { data, error } = await clienteSupabase.from('zonas_marte').select('*');
+                if (data && data.length > 0) {
+                    data.forEach(zona => {
+                        const marker = L.marker([zona.latitud, zona.longitud], { icon: iconoPulsante }).addTo(map);
+                    
+                        marker.on('click', () => {
+                            const zoomObjetivo = Math.max(map.getMinZoom() + 0.6, 4.8);
+                            map.flyTo([zona.latitud, zona.longitud], zoomObjetivo, { duration: 0.8 });
+                        
+                            const coordKey = `${Number(zona.latitud).toFixed(2)}_${Number(zona.longitud).toFixed(2)}`;
+                            const datosPython = prediccionesPython[zona.poi_id] 
+                                            || prediccionesPython[zona.nombre_region] 
+                                            || prediccionesPython[coordKey];
+
+                            if (datosPython) {
+                                zona.temperatura_promedio = datosPython.temperatura_promedio;
+                                zona.nivel_radiacion = datosPython.nivel_radiacion;
+                                zona.riesgo_operativo = datosPython.riesgo_operativo;
+                                zona.estrategia_ruta = datosPython.estrategia_ruta;
+                            }
+                        
+                            actualizarPanel(zona);
+                        });
+                    });
+                }
+            }
+            function actualizarPanel(zona) {
+                document.getElementById('instruccion').style.display = 'none';
+                document.getElementById('datos-zona').style.display = 'block';
+            
+                document.getElementById('ui-nombre').textContent = zona.nombre_region;
+                document.getElementById('ui-coords').textContent = `${zona.latitud}°, ${zona.longitud}°`;
+            
+                document.getElementById('ui-temp').textContent = zona.temperatura_promedio;
+                document.getElementById('ui-radiacion').textContent = zona.nivel_radiacion;
+                document.getElementById('ui-estrategia').textContent = zona.estrategia_ruta;
+            
+                const riesgoEl = document.getElementById('ui-riesgo');
+                riesgoEl.textContent = zona.riesgo_operativo;
+                riesgoEl.className = 'riesgo-badge riesgo-' + zona.riesgo_operativo;
+
+                const contenedorImg = document.getElementById('contenedor-img');
+                const imgEl = document.getElementById('ui-imagen');
+                if (zona.url_imagen_rover) {
+                    imgEl.src = zona.url_imagen_rover;
+                    contenedorImg.style.display = 'block';
+                } else {
+                    contenedorImg.style.display = 'none';
+                }
+            }
+
+            cargarZonasMarte();
+        </script>
+    </body>
+    </html>
+    

@@ -1,0 +1,11 @@
+{
+    "yellowknife_bay": {
+        "latitud": -4.568,
+        "longitud": 137.448,
+        "nombre_region": "Yellowknife Bay",
+        "temperatura_promedio": "-55.0 °C",
+        "nivel_radiacion": "0.64 mSv/día",
+        "riesgo_operativo": "Crítico",
+        "estrategia_ruta": "¡Alerta de modelo ML! Radiación elevada o temperatura extrema. Limitar EVA. ✔️ Radiación en niveles operacionales estables para tránsito estándar. | ✔️ Terreno con pendiente transitable para desplazamiento a pie con equipo estándar. | 🌪️ PROTOCOLO EÓLICO: En caso de reducción de visibilidad por levantamiento de polvo (Dust Devils o tormenta), abortar objetivos secundarios y activar baliza de retorno inmediato al hábitat. | 🌡️ GESTIÓN TÉRMICA: Retornar antes de agotar el 50% de la reserva energética del traje para garantizar margen ante descensos térmicos nocturnos extremos."
+    }
+}
