@@ -29,3 +29,47 @@ MARS-NAV is an interactive Martian surface exploration and astronaut survival te
 Before running the Python pipeline, ensure you have Python 3.9+ installed along with the required scientific and data-processing libraries.
 
 ### Python Imports & Dependencies:
+
+The backend scripts rely on the following core modules:
+
+- pandas & numpy (Tabular data manipulation and CSV ingestion)
+
+- scikit-learn (PolynomialFeatures, LinearRegression for training and forecasting the predictive model)
+
+- json & os (Standard library modules for data serialization and system file handling)
+
+Install all dependencies by running in your terminal:
+
+pip install pandas numpy scikit-learn
+
+(Note: Ensure all .py files remain in the root directory alongside the csv/ folder so internal module imports—such as from modelo import ... and from rutas import ...—resolve properly without path errors).
+
+## Workflow & Data Update Pipeline
+
+This project uses a static compilation architecture to guarantee zero-latency performance and eliminate CORS security restrictions in the browser during live demonstrations.
+
+### Important Note on Data Updates:
+
+Whenever the source dataset inside the csv/ folder is modified or expanded with new Martian coordinates, you must execute the Python scripts sequentially to retrain the models and recompile the web interface:
+
+- Step 1 — Validate ML & Routing Logic (Optional standalone test):
+  
+      - python modelo.py
+      - python rutas.py
+- Step 2 — Regenerate the JSON Telemetry Bridge:
+  
+      - python generar_json.py
+(Updates predicciones.json with the latest ML and survival calculations).
+
+Step 3 — Compile the Final Tactical Web Application:
+
+      - python generar_mapa.py
+(Rebuilds index_generado.html with the newly computed predictions embedded directly into the code).
+
+## How to View the Application
+
+Once the index_generado.html file has been generated:
+
+1- Simply double-click index_generado.html to open it in any modern web browser (Chrome, Edge, Firefox). (An active internet connection is required to load Martian base maps and rover photography from Supabase storage).
+
+2- Click on any pulsing solar beacon on the map to inspect the geological region, temperature and radiation metrics predicted by the Machine Learning model, the operational risk indicator, and the tactical EVA route strategy.
