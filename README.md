@@ -40,7 +40,7 @@ The backend scripts rely on the following core modules:
 
 Install all dependencies by running in your terminal:
 
-pip install pandas numpy scikit-learn
+      pip install pandas numpy scikit-learn
 
 (Note: Ensure all .py files remain in the root directory alongside the csv/ folder so internal module imports—such as from modelo import ... and from rutas import ...—resolve properly without path errors).
 
